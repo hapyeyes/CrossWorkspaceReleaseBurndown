@@ -1,0 +1,12 @@
+{
+   "name": "CrossWorkspaceReleaseBurndown",
+   "className": "CrossWorkspaceReleaseBurndownApp",
+   "server": "https://rally1.rallydev.com",
+   "sdk": "2.0",
+   "javascript": [
+      "App.js"
+   ],
+   "css": [
+      "app.css"
+   ]
+}
