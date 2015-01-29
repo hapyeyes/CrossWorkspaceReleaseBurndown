@@ -10,11 +10,118 @@
                 Ext.define('CrossWorkspaceReleaseBurndownApp', {
     extend: 'Rally.app.App',
     componentCls: 'app',
-    launch: function() {
-        //Write app code here
-        console.log('derp');
 
-        //API Docs: https://help.rallydev.com/apps/2.0/doc/
+    requires: [
+        'CrossWorkspaceReleaseBurndownCalculator'
+    ],
+
+    launch: function() {
+        this.add({
+            xtype: 'rallychart',
+            storeType: 'Rally.data.lookback.SnapshotStore',
+            storeConfig: this._getStoreConfig(),
+            calculatorType: 'CrossWorkspaceReleaseBurndownCalculator',
+            chartConfig: this._getChartConfig()
+        });
+    },
+
+    _getStoreConfig: function() {
+        return {
+            find: {
+                _ItemHierarchy: this.getDefaultWorkspace(),
+                _TypeHierarchy: 'HierarchicalRequirement',
+                Children: null
+            },
+            fetch: ['AcceptedDate'],
+            hydrate: ['AcceptedDate'],
+            sort: {
+                _ValidFrom: 1
+            },
+            context: this.getContext().getDataContext(),
+            limit: Infinity
+        };
+    },
+
+    _getChartConfig: function() {
+        return {
+            chart: {
+                defaultSeriesType: 'area',
+                zoomType: 'xy'
+            },
+            title: {
+                text: 'Cross Workspace Release Burndown'
+            },
+            xAxis: {
+                categories: [],
+                tickmarkPlacement: 'on',
+                tickInterval: 5,
+                title: {
+                    text: 'Date',
+                    margin: 10
+                }
+            },
+            yAxis: [
+                {
+                    title: {
+                        text: 'Accepted (points)'
+                    }
+                }
+            ],
+            tooltip: {
+                formatter: function() {
+                    return '' + this.x + '<br />' + this.series.name + ': ' + this.y;
+                }
+            },
+            plotOptions: {
+                series: {
+                    marker: {
+                        enabled: false,
+                        states: {
+                            hover: {
+                                enabled: true
+                            }
+                        }
+                    },
+                    groupPadding: 0.01
+                },
+                column: {
+                    stacking: null,
+                    shadow: false
+                }
+            }
+        };
+    },
+
+    getDefaultWorkspace: function() {
+        return 41529001;
+    }
+});
+
+                Ext.define('CrossWorkspaceReleaseBurndownCalculator', {
+    extend: 'Rally.data.lookback.calculator.TimeSeriesCalculator',
+
+    constructor: function(config) {
+        this.initConfig(config);
+        this.callParent(arguments);
+    },
+
+    getMetrics: function () {
+        return [
+            {
+                "field": "AcceptedDate",
+                "as": "Accepted Points",
+                "display": "line",
+                "f": "sum"
+            }
+            //{
+            //    "field": "PlanEstimate",
+            //    "as": "Completed",
+            //    "f": "filteredSum",
+            //    "filterField": "ScheduleState",
+            //    "filterValues": ["Accepted", "Released"],
+            //    "display": "column"
+            //}
+        ];
     }
 });
 
