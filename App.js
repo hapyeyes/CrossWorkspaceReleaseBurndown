@@ -31,12 +31,13 @@ Ext.define('CrossWorkspaceReleaseBurndownApp', {
 
                     subscription.getCollection('Workspaces').load({
                         fetch: ['ObjectID', 'Name', 'State'],
-                        filters: {
-                            property: 'State',
-                            operator: '!=',
-                            value: 'Closed'
-
-                        },
+                        filters: [
+                            {
+                                property: 'State',
+                                operator: '!=',
+                                value: 'Closed'
+                            }
+                        ],
                         callback: function(records) {
                             deferred.resolve(records);
                         }
