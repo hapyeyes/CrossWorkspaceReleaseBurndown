@@ -9,25 +9,32 @@ Ext.define('CrossWorkspaceReleaseBurndownApp', {
 
     launch: function() {
         Deft.Chain.pipeline([
-            this.getWorkspaceOidCollection,
+            this.getWorkspaceCollection,
             this.createReleaseComboBoxes
         ], this);
     },
 
-    getWorkspaceOidCollection: function() {
+    getWorkspaceCollection: function() {
         var deferred = Ext.create('Deft.Deferred');
 
         Ext.create('Rally.data.wsapi.Store', {
-            model: 'Workspace',
-            fetch: ['ObjectID'],
+            model: 'Subscription',
+            fetch: true,
             autoLoad: true,
             listeners: {
                 load: function (store, data) {
-                    var workspaceOids = _.map(data, function(record) {
-                        return record.get('ObjectID');
-                    });
+                    var subscription = data[0];
 
-                    deferred.resolve(workspaceOids);
+                    subscription.getCollection('Workspaces').load({
+                        fetch: ['ObjectID', 'Name', 'State'],
+                        callback: function (records) {
+                            var openWorkspaces = _.filter(records, function(record) {
+                                return record.get('State') !== 'Closed';
+                            });
+
+                            deferred.resolve(openWorkspaces);
+                        }
+                    });
                 }
             }
         });
@@ -35,16 +42,22 @@ Ext.define('CrossWorkspaceReleaseBurndownApp', {
         return deferred.promise;
     },
 
-    createReleaseComboBoxes: function(workspaceOids) {
+    createReleaseComboBoxes: function(workspaces) {
         var me = this;
 
-        return Deft.Promise.all(_.map(workspaceOids, function(workspace) {
+        return Deft.Promise.all(_.map(workspaces, function(workspace) {
             return function () {
                 var deferred = Ext.create('Deft.Deferred');
                 me.add({
                     xtype: 'rallyreleasecombobox',
-                    context: {
-                        workspace: '/workspace/' + workspace
+                    fieldLabel: workspace.get('Name'),
+                    storeConfig: {
+                        context: {
+                            workspace: Rally.util.Ref.getRelativeUri(workspace),
+                            project: null, // make project picker listen to this?
+                            projectScopeUp: false,
+                            projectScopeDown: false
+                        }
                     },
                     listeners: {
                         ready: function() {
