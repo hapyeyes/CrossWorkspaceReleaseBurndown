@@ -91,17 +91,23 @@
 
         this.add({
             xtype: 'rallymultiobjectpicker',
+            fieldLabel: 'Choose Releases',
             modelTypes: ['Release'],
             store: Ext.create('Rally.data.custom.Store', {
                 data: releases
             }),
             storeConfig: {
-                workspace: null,
-                project: null
+                context: {
+                    workspace: null,
+                    project: null
+                }
             },
             listeners: {
                 ready: function () {
                     deferred.resolve();
+                },
+                select: function(picker, value, values) {
+                    // filter values here...
                 }
             }
         });
