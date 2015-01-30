@@ -9,8 +9,8 @@ Ext.define('CrossWorkspaceReleaseBurndownCalculator', {
     getMetrics: function () {
         return [
             {
-                "field": "AcceptedDate",
-                "as": "Accepted Points",
+                "field": "PlanEstimate",
+                "as": "Derp Points",
                 "display": "line",
                 "f": "sum"
             }

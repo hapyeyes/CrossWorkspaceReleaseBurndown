@@ -4,13 +4,17 @@ Ext.define('CrossWorkspaceReleaseBurndownApp', {
 
     requires: [
         'Deft.Deferred',
+        'Rally.data.custom.Store',
+        'Rally.data.wsapi.Store',
+        'Rally.ui.picker.MultiObjectPicker',
         'CrossWorkspaceReleaseBurndownCalculator'
     ],
 
     launch: function() {
         Deft.Chain.pipeline([
             this.getWorkspaceCollection,
-            this.createReleaseComboBoxes
+            this.getReleasesInWorkspaces,
+            this.createReleasePicker
         ], this);
     },
 
@@ -19,7 +23,7 @@ Ext.define('CrossWorkspaceReleaseBurndownApp', {
 
         Ext.create('Rally.data.wsapi.Store', {
             model: 'Subscription',
-            fetch: true,
+            fetch: ['Workspaces'],
             autoLoad: true,
             listeners: {
                 load: function (store, data) {
@@ -27,12 +31,14 @@ Ext.define('CrossWorkspaceReleaseBurndownApp', {
 
                     subscription.getCollection('Workspaces').load({
                         fetch: ['ObjectID', 'Name', 'State'],
-                        callback: function (records) {
-                            var openWorkspaces = _.filter(records, function(record) {
-                                return record.get('State') !== 'Closed';
-                            });
+                        filters: {
+                            property: 'State',
+                            operator: '!=',
+                            value: 'Closed'
 
-                            deferred.resolve(openWorkspaces);
+                        },
+                        callback: function(records) {
+                            deferred.resolve(records);
                         }
                     });
                 }
@@ -42,33 +48,55 @@ Ext.define('CrossWorkspaceReleaseBurndownApp', {
         return deferred.promise;
     },
 
-    createReleaseComboBoxes: function(workspaces) {
-        var me = this;
+    getReleasesInWorkspaces: function(workspaces) {
+        var allReleases = [];
+        var deferred = Ext.create('Deft.Deferred');
 
-        return Deft.Promise.all(_.map(workspaces, function(workspace) {
-            return function () {
-                var deferred = Ext.create('Deft.Deferred');
-                me.add({
-                    xtype: 'rallyreleasecombobox',
-                    fieldLabel: workspace.get('Name'),
-                    storeConfig: {
-                        context: {
-                            workspace: Rally.util.Ref.getRelativeUri(workspace),
-                            project: null, // make project picker listen to this?
-                            projectScopeUp: false,
-                            projectScopeDown: false
-                        }
+        Deft.Promise.all(_.map(workspaces, function(workspace) {
+            return function() {
+                Ext.create('Rally.data.wsapi.Store', {
+                    model: 'Release',
+                    fetch: true,
+                    autoLoad: true,
+                    context: {
+                        workspace: Rally.util.Ref.getRelativeUri(workspace),
+                        project: null
                     },
                     listeners: {
-                        ready: function() {
-                            deferred.resolve();
+                        load: function (store, data) {
+                            allReleases = allReleases.concat(data);
+                            if (workspaces.indexOf(workspace) === workspaces.length - 1) {
+                                deferred.resolve(allReleases);
+                            }
                         }
-                    },
-                    scope: me
+                    }
                 });
-
-                return deferred.promise;
             }();
         }));
+
+        return deferred.promise;
+    },
+
+    createReleasePicker: function(releases) {
+        var deferred = Ext.create('Deft.Deferred');
+
+        this.add({
+            xtype: 'rallymultiobjectpicker',
+            modelTypes: ['Release'],
+            store: Ext.create('Rally.data.custom.Store', {
+                data: releases
+            }),
+            storeConfig: {
+                workspace: null,
+                project: null
+            },
+            listeners: {
+                ready: function () {
+                    deferred.resolve();
+                }
+            }
+        });
+
+        return deferred.promise;
     }
 });
