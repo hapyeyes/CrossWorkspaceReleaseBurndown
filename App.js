@@ -50,11 +50,10 @@ Ext.define('CrossWorkspaceReleaseBurndownApp', {
     },
 
     getReleasesInWorkspaces: function(workspaces) {
-        var allReleases = [];
-        var deferred = Ext.create('Deft.Deferred');
-
-        Deft.Promise.all(_.map(workspaces, function(workspace) {
+        Deft.Chain.parallel(_.map(workspaces, function(workspace) {
             return function() {
+                var deferred = Ext.create('Deft.Deferred');
+
                 Ext.create('Rally.data.wsapi.Store', {
                     model: 'Release',
                     fetch: true,
@@ -64,34 +63,37 @@ Ext.define('CrossWorkspaceReleaseBurndownApp', {
                         project: null
                     },
                     listeners: {
-                        load: function (store, data) {
-                            allReleases = allReleases.concat(data);
-                            if (workspaces.indexOf(workspace) === workspaces.length - 1) {
-                                deferred.resolve(allReleases);
-                            }
+                        load: function(store, data) {
+                            deferred.resolve(data);
                         }
                     }
                 });
-            }();
-        }));
 
-        return deferred.promise;
+                return deferred.promise;
+            };
+        }));
     },
 
     createReleasePicker: function(releases) {
+        debugger;
         var deferred = Ext.create('Deft.Deferred');
 
         this.add({
             xtype: 'rallymultiobjectpicker',
             fieldLabel: 'Choose Releases',
-            modelTypes: ['Release'],
-            store: Ext.create('Rally.data.custom.Store', {
-                data: releases
-            }),
+            modelType: 'Release',
             storeConfig: {
+                autoLoad: false,
+                data: releases,
                 context: {
                     workspace: null,
                     project: null
+                },
+                limit: Infinity,
+                listeners: {
+                    load: function(store, data) {
+                        // data loaded...
+                    }
                 }
             },
             listeners: {
