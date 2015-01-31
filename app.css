@@ -1,3 +1,7 @@
-.app {
-     /* Add app styles here */
+.release-name {
+     display: inline;
+}
+
+.workspace-names {
+     display: inline;
 }
