@@ -5,3 +5,6 @@
 .workspace-names {
      display: inline;
 }
+.release-dates {
+    text-align: right;
+}
