@@ -4,6 +4,8 @@ Ext.define('CrossWorkspaceReleaseBurndownApp', {
 
 	requires : [ 'CrossWorkspaceBurndownCalculator', 'Deft.Deferred', 'Ext.form.field.ComboBox', 'Rally.data.wsapi.Store' ],
 
+	forecastChart : undefined,
+
 	launch : function() {
 		Deft.Chain.pipeline([ this.getWorkspaceCollection, this.getReleasesInWorkspaces, this.filterLikeReleases, this.createFilteredCombobox ], this);
 	},
@@ -60,9 +62,18 @@ Ext.define('CrossWorkspaceReleaseBurndownApp', {
 
 		_.map(allReleases, function(release) {
 			var likeRelease = me._isLikeReleaseInList(releases, release.Name);
+			var workspaceRef = release.Workspace._ref;
+			var objectIdHash;
 
 			if (likeRelease) {
-				likeRelease.ObjectID.push(release.ObjectID);
+				// Push in the release oid by workspace
+				objectIdHash = likeRelease.ObjectID;
+				if (!objectIdHash[workspaceRef]) {
+					objectIdHash[workspaceRef] = [];
+				}
+				objectIdHash[workspaceRef].push(release.ObjectID);
+				likeRelease.ObjectID = objectIdHash;
+
 				if (!me._isLikeReleaseWorkspaceInList(likeRelease.Workspace, release.Workspace._refObjectName)) {
 					likeRelease.Workspace.push(release.Workspace);
 				}
@@ -72,10 +83,12 @@ Ext.define('CrossWorkspaceReleaseBurndownApp', {
 
 				var shiftedEndDate = Rally.util.DateTime.shiftTimezoneOffDate(release.ReleaseDate);
 				var formattedEndDate = Rally.util.DateTime.formatWithDefault(shiftedEndDate);
+				objectIdHash = {};
+				objectIdHash[workspaceRef] = [ release.ObjectID ];
 
 				releases.push({
 					Name : release.Name,
-					ObjectID : [ release.ObjectID ],
+					ObjectID : objectIdHash,
 					Workspace : [ release.Workspace ],
 					ReleaseStartDate : release.ReleaseStartDate,
 					ReleaseDate : release.ReleaseDate,
@@ -93,14 +106,15 @@ Ext.define('CrossWorkspaceReleaseBurndownApp', {
 	},
 
 	createFilteredCombobox : function(filteredReleases) {
+		var me = this;
 		var sharedReleases = [];
 		// TODO: should we allow it to be a setting
-		_.each(filteredReleases, function(release){
-			if(release.Workspace.length>1){
+		_.each(filteredReleases, function(release) {
+			if (release.Workspace.length > 1) {
 				sharedReleases.push(release);
 			}
 		});
-		
+
 		this.add({
 			xtype : 'combobox',
 			fieldLabel : 'Choose Release',
@@ -111,12 +125,25 @@ Ext.define('CrossWorkspaceReleaseBurndownApp', {
 			displayField : 'Name',
 			valueField : 'ObjectId',
 			width : 600,
+			triggerAction : 'all',
+			mode : 'local',
 			listeners : {
-				select : function(combo, record) {
-					// var data = record[0].getData();
-					var release = record[0].data;
-					debugger;
-				}
+				// FIXME: Select listener only works on first selection
+				'select' : {
+					single : false,
+					fn : function(combo, record) {
+						var release = record[0].data;
+						me._createChart(release);
+					}
+				},
+				'change' : {
+					fn : function(combo, record) {
+						// var data = record[0].getData();
+						var release = record[0].data;
+						// me._createChart(release);
+					}
+				},
+				scope : me
 			},
 			listConfig : {
 				itemTpl : new Ext.XTemplate('<div class="release-name">{Name} &nbsp; &ndash; &nbsp; </div>'
@@ -127,12 +154,12 @@ Ext.define('CrossWorkspaceReleaseBurndownApp', {
 		});
 	},
 
-	_getFilters : function(release) {
+	_getFilters : function(objectIDs) {
 
 		var releaseFilter = Ext.create('Rally.data.lookback.QueryFilter', {
 			property : 'Release',
 			operator : 'in',
-			value : release.ObjectID
+			value : objectIDs
 		});
 
 		var typeHierarchyFilter = Ext.create('Rally.data.lookback.QueryFilter', {
@@ -146,38 +173,46 @@ Ext.define('CrossWorkspaceReleaseBurndownApp', {
 			operator : '=',
 			value : null
 		});
-		// return releaseFilter.and(typeHierarchyFilter);
 		return releaseFilter.and(typeHierarchyFilter).and(childrenFilter);
-
 	},
+
 	/**
 	 * Generate the store config to retrieve all snapshots for all leaf child
 	 * stories
 	 */
-	_getStoreConfig : function(myFilters) {
-		console.log("myFilters: ", myFilters, myFilters.toObject());
-		console.log("context: ", this.getContext().getDataContext());
+	_getStoreConfig : function(release) {
+		var me = this;
+		var storeConfigs = [];
+		var storeConfig;
 
-		return {
-			filters : myFilters,
-			fetch : [ 'ScheduleState', 'PlanEstimate' ],
-			hydrate : [ 'ScheduleState' ],
-			context : this.getContext().getDataContext(),
-			compress : true,
-			useHttpPost : true,
-			autotload : true,
-			limit : Infinity
-		};
+		console.log("RELEASE CHOOSEN", release);
+		
+		for ( var workspace in release.ObjectID) {
+
+			storeConfig = {
+				filters : me._getFilters(release.ObjectID[workspace]),
+				fetch : [ 'ScheduleState', 'PlanEstimate' ],
+				hydrate : [ 'ScheduleState' ],
+				context : {
+					workspace : workspace,
+					project : null
+				},
+				compress : true,
+				useHttpPost : true,
+				autotload : true,
+				limit : Infinity
+			};
+			storeConfigs.push(storeConfig);
+		}
+		
+		return storeConfigs;
 	},
 
 	_createChart : function(release) {
-		console.log("creating chart");
 		var me = this;
 		var forecastVelocityStartDate;
 		var chartEndDate;
 		var userChartEndDate;
-
-		var myFilters = me._getFilters(release);
 
 		if (me.forecastChart) {
 			// remove old chart before recreating it
@@ -195,13 +230,12 @@ Ext.define('CrossWorkspaceReleaseBurndownApp', {
 		}
 
 		chartEndDate = userChartEndDate ? userChartEndDate : release.ReleaseDate;
-
 		me.forecastChart = Ext.create('Rally.ui.chart.Chart', {
 			itemId : 'forecastChart', // we'll use this item ID later to get
 			// the users' selection
 			storeType : 'Rally.data.lookback.SnapshotStore',
-			storeConfig : me._getStoreConfig(myFilters),
-			calculatorType : 'Rally.example.BurnCalculator',
+			storeConfig : me._getStoreConfig(release),
+			calculatorType : 'CrossWorkspaceBurndownCalculator',
 			calculatorConfig : {
 				timeZone : "GMT",
 				completedScheduleStateNames : [ 'Accepted' ],

@@ -10,7 +10,6 @@ Ext.define('CrossWorkspaceBurndownCalculator', {
 
 	getDerivedFieldsOnInput : function() {
 		var completedScheduleStateNames = this.getCompletedScheduleStateNames();
-		var totalBackLogStateNames = [ 'Backlog', 'Defined', 'In-Progress', 'Completed', "Accepted" ];
 
 		return [ {
 			"as" : "AcceptedPoints",
@@ -28,13 +27,9 @@ Ext.define('CrossWorkspaceBurndownCalculator', {
 			// Sum of Backlog, Defined, In Progress, Accepted
 			"as" : "TotalBacklog",
 			"f" : function(snapshot) {
-				var ss = snapshot.ScheduleState;
-				if (totalBackLogStateNames.indexOf(ss) > -1) {
-					if (snapshot.PlanEstimate) {
-						return snapshot.PlanEstimate;
-					}
+				if (snapshot.PlanEstimate) {
+					return snapshot.PlanEstimate;
 				}
-
 				return 0;
 			}
 		} ];
@@ -117,7 +112,33 @@ Ext.define('CrossWorkspaceBurndownCalculator', {
 		return 0;
 	},
 
+	// Had to overwrite to allow more than one store
+	/**
+	 * The entry point to a calculator instance. Prepares the data from the
+	 * store to be passed along to Lumenize. You should override this function
+	 * if you require extra functionality beyond collecting store data in an
+	 * array to pass to #runCalculation. This function is responsible for
+	 * returning the data as an object with categories to display and a
+	 * Highcharts series. For example, { "series": [...], "categories": ["Line
+	 * 1", "Column 1", "Line 2"] }
+	 * 
+	 * @param store
+	 *            the data store
+	 * @return {Object} highcharts series and categories
+	 */
+	prepareChartData : function(store) {
+		var snapshots = [];
+		console.log(store);
+		for ( var i in store) {
+			store[i].each(function(record) {
+				snapshots.push(record.raw);
+			});
+		}
+		return this.runCalculation(snapshots);
+	},
+
 	runCalculation : function(snapshots) {
+		debugger;
 		var chartData = this.callParent(arguments);
 		var forecastVelocityLineIndex = 4;
 		var acceptedLineIndex = 0;
