@@ -9,11 +9,16 @@ Ext.define('CrossWorkspaceBurndownCalculator', {
 	},
 
 	getDerivedFieldsOnInput : function() {
+		var me = this;
 		var completedScheduleStateNames = this.getCompletedScheduleStateNames();
-
-		return [ {
+		var workspacePoints;
+		var workspace;
+		
+		var data = [ {
 			"as" : "AcceptedPoints",
 			"f" : function(snapshot) {
+				debugger;
+
 				var ss = snapshot.ScheduleState;
 				if (completedScheduleStateNames.indexOf(ss) > -1) {
 					if (snapshot.PlanEstimate) {
@@ -24,7 +29,7 @@ Ext.define('CrossWorkspaceBurndownCalculator', {
 				return 0;
 			}
 		}, {
-			// Sum of Backlog, Defined, In Progress, Accepted
+			// Sum of Planned Estimate for all states
 			"as" : "TotalBacklog",
 			"f" : function(snapshot) {
 				if (snapshot.PlanEstimate) {
@@ -33,10 +38,48 @@ Ext.define('CrossWorkspaceBurndownCalculator', {
 				return 0;
 			}
 		} ];
+
+		for ( var i in me.selectedRelease.Workspace) {
+			workspace = me.selectedRelease.Workspace[i];
+			workspacePoints = [ {
+				"as" : workspace._refObjectName + " Accepted points",
+				"f" : function(snapshot) {
+					debugger;
+					var ss = snapshot.ScheduleState;
+					if (snapshot.workspace === workspace._ref) {
+						if (completedScheduleStateNames.indexOf(ss) > -1) {
+							if (snapshot.PlanEstimate) {
+								return snapshot.PlanEstimate;
+							}
+						}
+					}
+					return 0;
+				}
+			}, {
+				"as" : workspace._refObjectName + " Total Backlog",
+				"f" : function(snapshot) {
+					if (snapshot.workspace === workspace._ref) {
+						if (snapshot.PlanEstimate) {
+							return snapshot.PlanEstimate;
+						}
+					}
+					return 0;
+				}
+			} ];
+
+			data = data.concat(workspacePoints);
+		}
+		debugger;
+
+		return data;
 	},
 
 	getMetrics : function() {
-		return [ {
+		var me = this;
+		var workspaceMetrics;
+		var workspace;
+		
+		var metrics = [ {
 			"field" : "AcceptedPoints",
 			"as" : "Accepted",
 			"f" : "sum",
@@ -47,6 +90,22 @@ Ext.define('CrossWorkspaceBurndownCalculator', {
 			"f" : "sum",
 			"display" : "line"
 		} ];
+		for ( var i in me.selectedRelease.Workspace) {
+			workspace = me.selectedRelease.Workspace[i];
+			workspaceMetrics = [ {
+				"field" : workspace._refObjectName + " AcceptedPoints",
+				"as" : workspace._refObjectName + " Accepted",
+				"f" : "sum",
+				"display" : "line"
+			}, {
+				"field" : workspace._refObjectName + " TotalBacklog",
+				"as" : workspace._refObjectName + " Total Backlog",
+				"f" : "sum",
+				"display" : "line"
+			} ];
+			metrics = metrics.concat(workspaceMetrics);
+		}
+		return metrics;
 	},
 
 	getDerivedFieldsAfterSummary : function() {
@@ -128,10 +187,13 @@ Ext.define('CrossWorkspaceBurndownCalculator', {
 	 */
 	prepareChartData : function(store) {
 		var snapshots = [];
+		var raw;
 		console.log(store);
 		for ( var i in store) {
 			store[i].each(function(record) {
-				snapshots.push(record.raw);
+				raw = record.raw;
+				raw.workspace = store[i].context.workspace;
+				snapshots.push(raw);
 			});
 		}
 		return this.runCalculation(snapshots);

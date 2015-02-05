@@ -18,12 +18,13 @@
 	},
 
 	getDerivedFieldsOnInput : function() {
+		var me = this;
 		var completedScheduleStateNames = this.getCompletedScheduleStateNames();
-		var totalBackLogStateNames = [ 'Backlog', 'Defined', 'In-Progress', 'Completed', "Accepted" ];
-
-		return [ {
+		var workspacePoints;
+		var data = [ {
 			"as" : "AcceptedPoints",
 			"f" : function(snapshot) {
+				debugger;
 				var ss = snapshot.ScheduleState;
 				if (completedScheduleStateNames.indexOf(ss) > -1) {
 					if (snapshot.PlanEstimate) {
@@ -34,23 +35,51 @@
 				return 0;
 			}
 		}, {
-			// Sum of Backlog, Defined, In Progress, Accepted
+			// Sum of Planned Estimate for all states
 			"as" : "TotalBacklog",
 			"f" : function(snapshot) {
-				var ss = snapshot.ScheduleState;
-				if (totalBackLogStateNames.indexOf(ss) > -1) {
-					if (snapshot.PlanEstimate) {
-						return snapshot.PlanEstimate;
-					}
+				if (snapshot.PlanEstimate) {
+					return snapshot.PlanEstimate;
 				}
-
 				return 0;
 			}
 		} ];
+
+		for ( var workspace in me.selectedRelease.Workspaces) {
+			workspacePoints = [ {
+				"as" : workspace._refObjectName + " Accepted points",
+				"f" : function(snapshot) {
+					var ss = snapshot.ScheduleState;
+					if (snapshot.workspace === workspace.ref) {
+						if (completedScheduleStateNames.indexOf(ss) > -1) {
+							if (snapshot.PlanEstimate) {
+								return snapshot.PlanEstimate;
+							}
+						}
+					}
+					return 0;
+				}
+			}, {
+				"as" : workspace._refObjectName + " Total Backlog",
+				"f" : function(snapshot) {
+					if (snapshot.workspace === workspace.ref) {
+						if (snapshot.PlanEstimate) {
+							return snapshot.PlanEstimate;
+						}
+					}
+					return 0;
+				}
+			} ];
+
+			data.concat(workspacePoints);
+		}
+		return data;
 	},
 
 	getMetrics : function() {
-		return [ {
+		var me = this;
+		var workspaceMetrics;
+		var metrics = [ {
 			"field" : "AcceptedPoints",
 			"as" : "Accepted",
 			"f" : "sum",
@@ -61,6 +90,21 @@
 			"f" : "sum",
 			"display" : "line"
 		} ];
+		for ( var workspace in me.selectedRelease.Workspaces) {
+			workspaceMetrics = [ {
+				"field" : workspace._refObjectName + " AcceptedPoints",
+				"as" : workspace._refObjectName + " Accepted",
+				"f" : "sum",
+				"display" : "line"
+			}, {
+				"field" : workspace._refObjectName + " TotalBacklog",
+				"as" : workspace._refObjectName + " Total Backlog",
+				"f" : "sum",
+				"display" : "line"
+			} ];
+			metrics.concat(workspaceMetrics);
+		}
+		return metrics;
 	},
 
 	getDerivedFieldsAfterSummary : function() {
@@ -126,14 +170,15 @@
 		return 0;
 	},
 
+	// Had to overwrite to allow more than one store
 	/**
 	 * The entry point to a calculator instance. Prepares the data from the
 	 * store to be passed along to Lumenize. You should override this function
 	 * if you require extra functionality beyond collecting store data in an
 	 * array to pass to #runCalculation. This function is responsible for
 	 * returning the data as an object with categories to display and a
-	 * Highcharts series. For example,
-	 *  { "series": [...], "categories": ["Line 1", "Column 1", "Line 2"] }
+	 * Highcharts series. For example, { "series": [...], "categories": ["Line
+	 * 1", "Column 1", "Line 2"] }
 	 * 
 	 * @param store
 	 *            the data store
@@ -141,16 +186,20 @@
 	 */
 	prepareChartData : function(store) {
 		var snapshots = [];
+		var raw;
 		console.log(store);
 		for ( var i in store) {
 			store[i].each(function(record) {
-				snapshots.push(record.raw);
+				raw = record.raw;
+				raw.workspace = store[i].context.workspace;
+				snapshots.push(raw);
 			});
 		}
 		return this.runCalculation(snapshots);
 	},
 
 	runCalculation : function(snapshots) {
+		debugger;
 		var chartData = this.callParent(arguments);
 		var forecastVelocityLineIndex = 4;
 		var acceptedLineIndex = 0;
@@ -392,6 +441,8 @@
 		var storeConfigs = [];
 		var storeConfig;
 
+		console.log("RELEASE CHOOSEN", release);
+		
 		for ( var workspace in release.ObjectID) {
 
 			storeConfig = {
@@ -409,14 +460,11 @@
 			};
 			storeConfigs.push(storeConfig);
 		}
-
-		console.log(storeConfigs);
-
+		
 		return storeConfigs;
 	},
 
 	_createChart : function(release) {
-		console.log("creating chart");
 		var me = this;
 		var forecastVelocityStartDate;
 		var chartEndDate;
@@ -451,7 +499,8 @@
 				startDate : release.ReleaseStartDate,
 				scopeEndDate : chartEndDate,
 				dailyVelocity : this.dailyVelocity,
-				forecastVelocityStartDate : forecastVelocityStartDate
+				forecastVelocityStartDate : forecastVelocityStartDate,
+				selectedRelease : release
 			},
 			chartColors : [ "#005eb8", "#8dc63f", "#666666", "#c0c0c0", "#FA58F4" ],
 			chartConfig : me._getChartConfig()

@@ -243,7 +243,8 @@ Ext.define('CrossWorkspaceReleaseBurndownApp', {
 				startDate : release.ReleaseStartDate,
 				scopeEndDate : chartEndDate,
 				dailyVelocity : this.dailyVelocity,
-				forecastVelocityStartDate : forecastVelocityStartDate
+				forecastVelocityStartDate : forecastVelocityStartDate,
+				selectedRelease : release
 			},
 			chartColors : [ "#005eb8", "#8dc63f", "#666666", "#c0c0c0", "#FA58F4" ],
 			chartConfig : me._getChartConfig()
