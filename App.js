@@ -186,7 +186,7 @@ Ext.define('CrossWorkspaceReleaseBurndownApp', {
 		var storeConfig;
 
 		console.log("RELEASE CHOOSEN", release);
-		
+
 		for ( var workspace in release.ObjectID) {
 
 			storeConfig = {
@@ -204,7 +204,7 @@ Ext.define('CrossWorkspaceReleaseBurndownApp', {
 			};
 			storeConfigs.push(storeConfig);
 		}
-		
+
 		return storeConfigs;
 	},
 
@@ -261,7 +261,7 @@ Ext.define('CrossWorkspaceReleaseBurndownApp', {
 				zoomType : 'xy'
 			},
 			title : {
-				text : 'Wind River Burnup and Forecast',
+				text : 'Wind River Cross Workspace Burnup and Forecast',
 				margin : 30
 			},
 			xAxis : {

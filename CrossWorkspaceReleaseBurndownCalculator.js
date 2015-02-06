@@ -138,7 +138,6 @@ Ext.define('CrossWorkspaceBurndownCalculator', {
 	},
 
 	runCalculation : function(snapshots) {
-		debugger;
 		var chartData = this.callParent(arguments);
 		var forecastVelocityLineIndex = 4;
 		var acceptedLineIndex = 0;
@@ -147,9 +146,6 @@ Ext.define('CrossWorkspaceBurndownCalculator', {
 		var forecastVelocityStartDateStr;
 		var i;
 
-		// Calculate the Velocity Forecast Line
-		// Take the Accepted Line Index, and add the dailyVelocity to the line
-		// this.forecastVelocityStartDate = new Date("2014/07/01");
 		console.log("forecastVelocityStartDate", this.forecastVelocityStartDate);
 		if (chartData && this.dailyVelocity && this.forecastVelocityStartDate) {
 			console.log("runCalculation", this.dailyVelocity);
